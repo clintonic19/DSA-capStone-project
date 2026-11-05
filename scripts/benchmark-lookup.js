@@ -10,7 +10,7 @@ const map = new Map();
 for (let index = 0; index < BOOKINGS; index += 1) {
   const booking = { reference: newReference(), number: index };
   list.push(booking);
-  map.set(booking.reference, booking);
+  map.set(booking.reference, booking); //
 }
 
 const targets = Array.from(
@@ -19,7 +19,7 @@ const targets = Array.from(
 );
 
 function time(label, lookup) {
-  const start = performance.now();
+  const start = performance.now(); 
 
   for (const reference of targets) {
     lookup(reference);

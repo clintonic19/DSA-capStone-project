@@ -9,6 +9,7 @@ import {
   offerNextOnWaitlist,
   seatsLeft,
 } from '../src/domain/inventory.js';
+
 import { DomainError } from '../src/domain/errors.js';
 
 const store = createStore();
@@ -28,20 +29,20 @@ const tier = addTier(store, event.id, {
 });
 
 console.log(
-  `Created "${event.title}" with ${tier.capacity} seats in ${tier.name}.\n`,
+  `Created: "${event.title}" with ${tier.capacity} seats in ${tier.name}.\n`,
 );
 
 function attempt(label, action) {
   try {
     const result = action();
-    console.log(`OK    ${label}`);
+    console.log(`OK:    ${label}`);
     return result;
   } catch (error) {
     if (!(error instanceof DomainError)) {
       throw error;
     }
 
-    console.log(`FAIL  ${label} -> ${error.code}: ${error.message}`);
+    console.log(`FAIL:  ${label} -> ${error.code}: ${error.message}`);
     return undefined;
   }
 }

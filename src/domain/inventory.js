@@ -50,6 +50,31 @@ function requireQuantity(quantity) {
   return quantity;
 }
 
+function requireRealIsoDate(value) {
+  if (typeof value !== 'string') {
+    return;
+  }
+
+  const match = /^(\d{4})-(\d{2})-(\d{2})(?:$|[T ])/.exec(value.trim());
+
+  if (!match) {
+    return;
+  }
+
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const date = new Date(Date.UTC(year, month - 1, day));
+
+  if (
+    date.getUTCFullYear() !== year ||
+    date.getUTCMonth() !== month - 1 ||
+    date.getUTCDate() !== day
+  ) {
+    throw new DomainError('VALIDATION', 'startsAt must be a valid date');
+  }
+}
+
 function getEvent(store, eventId) {
   const event = store.events.get(eventId);
 
@@ -74,6 +99,8 @@ export function createEvent(
   store,
   { title, city, venue = '', startsAt, organizerId } = {},
 ) {
+  requireRealIsoDate(startsAt);
+
   const startsAtDate = new Date(startsAt);
 
   if (Number.isNaN(startsAtDate.getTime())) {
@@ -140,6 +167,52 @@ export function publishEvent(store, eventId) {
 
   event.status = 'published';
   return event;
+}
+
+export function listEventSummaries(store, { publishedOnly = true } = {}) {
+  const summaries = [];
+
+  for (const event of store.events.values()) {
+    if (publishedOnly && event.status !== 'published') {
+      continue;
+    }
+
+    const tiers = event.tierIds
+      .map((tierId) => store.tiers.get(tierId))
+      .filter((tier) => tier !== undefined);
+
+    let cheapestPriceCents = null;
+    let totalSeatsLeft = 0;
+
+    for (const tier of tiers) {
+      if (
+        cheapestPriceCents === null ||
+        tier.priceCents < cheapestPriceCents
+      ) {
+        cheapestPriceCents = tier.priceCents;
+      }
+
+      totalSeatsLeft += seatsLeft(tier);
+    }
+
+    summaries.push({
+      id: event.id,
+      organizerId: event.organizerId,
+      title: event.title,
+      city: event.city,
+      venue: event.venue,
+      startsAt: event.startsAt,
+      status: event.status,
+      tierCount: tiers.length,
+      tierIds: event.tierIds.slice(),
+      cheapestPriceCents,
+      minPriceCents: cheapestPriceCents,
+      seatsLeft: totalSeatsLeft,
+      totalSeatsLeft,
+    });
+  }
+
+  return summaries;
 }
 
 export function seatsLeft(tier) {
