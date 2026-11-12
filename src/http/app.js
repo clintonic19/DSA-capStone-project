@@ -4,6 +4,9 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { DomainError } from '../domain/errors.js';
 import { createRouter } from './router.js';
+import { registerApiRoutes } from './apiRoutes.js';
+import { createMemoryRepository } from '../repositories/memory.js';
+import { createMockPaymentGateway } from '../lib/mockPaymentGateway.js';
 
 const APP_DIRECTORY = path.dirname(fileURLToPath(import.meta.url));
 const DEFAULT_PUBLIC_DIRECTORY = path.resolve(APP_DIRECTORY, '../../public');
@@ -42,6 +45,18 @@ function sendJson(response, status, value, headOnly = false) {
 function domainErrorStatus(error) {
   if (error.code === 'NOT_FOUND') {
     return 404;
+  }
+
+  if (error.code === 'FORBIDDEN') {
+    return 403;
+  }
+
+  if (error.code === 'AUTHENTICATION_REQUIRED') {
+    return 401;
+  }
+
+  if (error.code === 'INVALID_TRANSITION' || error.code === 'SOLD_OUT') {
+    return 409;
   }
 
   return 400;
@@ -171,9 +186,14 @@ async function serveStatic(request, response, pathname, publicDirectory) {
   response.end(request.method === 'HEAD' ? undefined : content);
 }
 
-export function createApp({ publicDirectory = DEFAULT_PUBLIC_DIRECTORY } = {}) {
+export function createApp({
+  publicDirectory = DEFAULT_PUBLIC_DIRECTORY,
+  repository = createMemoryRepository(),
+  paymentGateway = createMockPaymentGateway(),
+} = {}) {
   const router = createRouter();
   router.add('GET', '/health', () => ({ status: 'ok' }));
+  registerApiRoutes(router, { repository, paymentGateway });
 
   return createServer(async (request, response) => {
     const headOnly = request.method === 'HEAD';
@@ -190,7 +210,14 @@ export function createApp({ publicDirectory = DEFAULT_PUBLIC_DIRECTORY } = {}) {
           body,
           url: requestUrl,
         });
-        sendJson(response, 200, result, headOnly);
+        const hasResponseStatus =
+          result !== null &&
+          typeof result === 'object' &&
+          Number.isInteger(result.statusCode) &&
+          Object.hasOwn(result, 'body');
+        const statusCode = hasResponseStatus ? result.statusCode : 200;
+        const responseBody = hasResponseStatus ? result.body : result;
+        sendJson(response, statusCode, responseBody, headOnly);
         return;
       }
 
