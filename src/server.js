@@ -2,16 +2,17 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createApp } from './http/app.js';
 import { readConfig } from './config.js';
-import { createMemoryRepository } from './repositories/memory.js';
+import { createSqliteRepository } from './repositories/sqlite.js';
 import { createMockPaymentGateway } from './lib/mockPaymentGateway.js';
 
 export function startServer({
   port = readConfig().port,
-  repository = createMemoryRepository(),
+  repository = createSqliteRepository(),
   paymentGateway = createMockPaymentGateway(),
 } = {}) {
   const server = createApp({ repository, paymentGateway });
 
+  server.once('close', () => repository.close?.());
   server.listen(port, () => {
     console.log(`Event ticketing server listening on port ${server.address().port}`);
   });
